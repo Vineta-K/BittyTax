@@ -13,7 +13,7 @@ from ..out_record import TransactionOutRecord
 from ..datamerge import DataMerge, MergeDataRow
 from ..exceptions import UnexpectedContentError
 from ..parsers.etherscan import etherscan_txns, etherscan_tokens, etherscan_nfts, etherscan_int, \
-                                get_note
+    get_note
 
 PRECISION = Decimal('0.' + '0' * 18)
 
@@ -22,105 +22,105 @@ TOKENS = 'token'
 NFTS = 'nft'
 INTERNAL_TXNS = 'int'
 
+
 def merge_etherscan(data_files):
     return do_merge_etherscan(data_files, [])
+
 
 def do_merge_etherscan(data_files, staking_addresses):
     merge = False
     tx_ids = {}
 
+    # Group all tx data with same txhash in preparation to merge?
     for file_id in data_files:
         for dr in data_files[file_id].data_rows:
             if not dr.t_record:
                 continue
 
-            wallet = dr.t_record.wallet[- abs(TransactionOutRecord.WALLET_ADDR_LEN):]
-            if wallet not in tx_ids:
-                tx_ids[wallet] = {}
+            if dr.row_dict['Txhash'] not in tx_ids:
+                tx_ids[dr.row_dict['Txhash']] = []
 
-            if dr.row_dict['Txhash'] not in tx_ids[wallet]:
-                tx_ids[wallet][dr.row_dict['Txhash']] = []
+            tx_ids[dr.row_dict['Txhash']]. \
+                append(MergeDataRow(dr, data_files[file_id], file_id))
 
-            tx_ids[wallet][dr.row_dict['Txhash']]. \
-                    append(MergeDataRow(dr, data_files[file_id], file_id))
-
-    for wallet in tx_ids:
-        for txn in tx_ids[wallet]:
-            if len(tx_ids[wallet][txn]) == 1:
-                if config.debug:
-                    sys.stderr.write("%smerge: %s:%s\n" % (
-                        Fore.BLUE,
-                        tx_ids[wallet][txn][0].data_file_id.ljust(5),
-                        tx_ids[wallet][txn][0].data_row))
-                continue
-
-            for t in tx_ids[wallet][txn]:
-                if config.debug:
-                    sys.stderr.write("%smerge: %s:%s\n" % (
-                        Fore.GREEN,
-                        t.data_file_id.ljust(5),
-                        t.data_row))
-
-            t_ins, t_outs, t_fee = get_ins_outs(tx_ids[wallet][txn])
-
+    # Iterate through grouped tx data and merge into one row if possible - need to handle multi buy/sell MEV arbitrage cases at some point
+    for txns in tx_ids.values():
+        if len(txns) == 1:
             if config.debug:
-                output_records(t_ins, t_outs, t_fee)
-                sys.stderr.write("%smerge:     consolidate:\n" % (Fore.YELLOW))
+                sys.stderr.write("%smerge: %s:%s\n" % (
+                    Fore.BLUE,
+                    txns[0].data_file_id.ljust(5),
+                    txns[0].data_row))
+            continue
 
-            consolidate(tx_ids[wallet][txn], [TXNS, INTERNAL_TXNS])
-
-            t_ins, t_outs, t_fee = get_ins_outs(tx_ids[wallet][txn])
-
+        for t in txns:
             if config.debug:
-                output_records(t_ins, t_outs, t_fee)
-                sys.stderr.write("%smerge:     merge:\n" % (Fore.YELLOW))
+                sys.stderr.write("%smerge: %s:%s\n" % (
+                    Fore.GREEN,
+                    t.data_file_id.ljust(5),
+                    t.data_row))
 
-            if t_fee:
-                fee_quantity = t_fee.t_record.fee_quantity
-                fee_asset = t_fee.t_record.fee_asset
+        t_ins, t_outs, t_fee = get_ins_outs(txns)
 
-            t_ins_orig = copy.copy(t_ins)
-            if t_fee:
-                method_handling(t_ins, t_fee, staking_addresses)
+        if config.debug:
+            output_records(t_ins, t_outs, t_fee)
+            sys.stderr.write("%smerge:     consolidate:\n" % (Fore.YELLOW))
 
-            # Make trades
-            if len(t_ins) == 1 and t_outs:
-                do_etherscan_multi_sell(t_ins, t_outs, t_fee)
-            elif len(t_outs) == 1 and t_ins:
-                do_etherscan_multi_buy(t_ins, t_outs, t_fee)
-            elif len(t_ins) > 1 and len(t_outs) > 1:
-                # multi-sell to multi-buy trade not supported
-                sys.stderr.write("%sWARNING%s Merge failure for Txhash: %s\n" % (
-                    Back.YELLOW+Fore.BLACK, Back.RESET+Fore.YELLOW, txn))
+        consolidate(txns, [TXNS, INTERNAL_TXNS])
 
-                for mdr in tx_ids[wallet][txn]:
-                    mdr.data_row.failure = UnexpectedContentError(
-                        mdr.data_file.parser.in_header.index('Txhash'),
-                        'Txhash', mdr.data_row.row_dict['Txhash'])
-                    sys.stderr.write("%srow[%s] %s\n" % (
-                        Fore.YELLOW,
-                        mdr.data_file.parser.in_header_row_num + mdr.data_row.line_num,
-                        mdr.data_row))
-                continue
+        t_ins, t_outs, t_fee = get_ins_outs(txns)
 
-            if t_fee:
-                # Split fees
-                t_all = [t for t in t_ins_orig + t_outs if t.t_record]
-                do_fee_split(t_all, t_fee, fee_quantity, fee_asset)
+        if config.debug:
+            output_records(t_ins, t_outs, t_fee)
+            sys.stderr.write("%smerge:     merge:\n" % (Fore.YELLOW))
 
-            merge = True
+        if t_fee:
+            fee_quantity = t_fee.t_record.fee_quantity
+            fee_asset = t_fee.t_record.fee_asset
 
-            if config.debug:
-                output_records(t_ins_orig, t_outs, t_fee)
+        t_ins_orig = copy.copy(t_ins)
+        if t_fee:
+            method_handling(t_ins, t_fee, staking_addresses)
+
+        # Make trades
+        if len(t_ins) == 1 and t_outs:
+            do_etherscan_multi_sell(t_ins, t_outs, t_fee)
+        elif len(t_outs) == 1 and t_ins:
+            do_etherscan_multi_buy(t_ins, t_outs, t_fee)
+        elif len(t_ins) > 1 and len(t_outs) > 1:
+            # multi-sell to multi-buy trade not supported
+            sys.stderr.write("%sWARNING%s Merge failure for Txhash: %s\n" % (
+                Back.YELLOW+Fore.BLACK, Back.RESET+Fore.YELLOW, txns))
+
+            for mdr in txns:
+                mdr.data_row.failure = UnexpectedContentError(
+                    mdr.data_file.parser.in_header.index('Txhash'),
+                    'Txhash', mdr.data_row.row_dict['Txhash'])
+                sys.stderr.write("%srow[%s] %s\n" % (
+                    Fore.YELLOW,
+                    mdr.data_file.parser.in_header_row_num + mdr.data_row.line_num,
+                    mdr.data_row))
+            continue
+
+        if t_fee:
+            # Split fees
+            t_all = [t for t in t_ins_orig + t_outs if t.t_record]
+            do_fee_split(t_all, t_fee, fee_quantity, fee_asset)
+
+        merge = True
+
+        if config.debug:
+            output_records(t_ins_orig, t_outs, t_fee)
 
     return merge
 
-def get_ins_outs(tx_ids):
-    t_ins = [t.data_row for t in tx_ids if t.data_row.t_record and
+
+def get_ins_outs(txns):
+    t_ins = [t.data_row for t in txns if t.data_row.t_record and
              t.data_row.t_record.t_type == TransactionOutRecord.TYPE_DEPOSIT]
-    t_outs = [t.data_row for t in tx_ids if t.data_row.t_record and
+    t_outs = [t.data_row for t in txns if t.data_row.t_record and
               t.data_row.t_record.t_type == TransactionOutRecord.TYPE_WITHDRAWAL]
-    t_fees = [t.data_row for t in tx_ids if t.data_row.t_record and
+    t_fees = [t.data_row for t in txns if t.data_row.t_record and
               t.data_row.t_record.fee_quantity]
 
     if len(t_fees) == 0:
@@ -132,45 +132,47 @@ def get_ins_outs(tx_ids):
 
     return t_ins, t_outs, t_fee
 
-def consolidate(tx_ids, file_ids):
+
+def consolidate(txns, file_ids):
     tx_assets = {}
 
-    for txn in list(tx_ids):
-        if txn.data_file_id not in file_ids:
+    for t in list(txns):
+        if t.data_file_id not in file_ids:
             return
 
-        asset = txn.data_row.t_record.get_asset()
+        asset = t.data_row.t_record.get_asset()
         if asset not in tx_assets:
-            tx_assets[asset] = txn
-            tx_assets[asset].quantity += txn.data_row.t_record.get_quantity()
+            tx_assets[asset] = t
+            tx_assets[asset].quantity += t.data_row.t_record.get_quantity()
         else:
-            tx_assets[asset].quantity += txn.data_row.t_record.get_quantity()
-            txn.data_row.t_record = None
-            tx_ids.remove(txn)
+            tx_assets[asset].quantity += t.data_row.t_record.get_quantity()
+            t.data_row.t_record = None
+            txns.remove(t)
 
     for asset in tx_assets:
-        txn = tx_assets[asset]
-        if txn.quantity > 0:
-            txn.data_row.t_record.t_type = TransactionOutRecord.TYPE_DEPOSIT
-            txn.data_row.t_record.buy_asset = asset
-            txn.data_row.t_record.buy_quantity = txn.quantity
-            txn.data_row.t_record.sell_asset = ''
-            txn.data_row.t_record.sell_quantity = None
+        t = tx_assets[asset]
+        if t.quantity > 0:
+            t.data_row.t_record.t_type = TransactionOutRecord.TYPE_DEPOSIT
+            t.data_row.t_record.buy_asset = asset
+            t.data_row.t_record.buy_quantity = t.quantity
+            t.data_row.t_record.sell_asset = ''
+            t.data_row.t_record.sell_quantity = None
         elif tx_assets[asset].quantity < 0:
-            txn.data_row.t_record.t_type = TransactionOutRecord.TYPE_WITHDRAWAL
-            txn.data_row.t_record.buy_asset = ''
-            txn.data_row.t_record.buy_quantity = None
-            txn.data_row.t_record.sell_asset = asset
-            txn.data_row.t_record.sell_quantity = abs(txn.quantity)
+            t.data_row.t_record.t_type = TransactionOutRecord.TYPE_WITHDRAWAL
+            t.data_row.t_record.buy_asset = ''
+            t.data_row.t_record.buy_quantity = None
+            t.data_row.t_record.sell_asset = asset
+            t.data_row.t_record.sell_quantity = abs(t.quantity)
         else:
-            if txn.data_row.t_record.fee_quantity:
-                txn.data_row.t_record.t_type = TransactionOutRecord.TYPE_SPEND
-                txn.data_row.t_record.buy_asset = ''
-                txn.data_row.t_record.buy_quantity = None
-                txn.data_row.t_record.sell_asset = asset
-                txn.data_row.t_record.sell_quantity = Decimal(0)
+            if t.data_row.t_record.fee_quantity:
+                t.data_row.t_record.t_type = TransactionOutRecord.TYPE_SPEND
+                t.data_row.t_record.buy_asset = ''
+                t.data_row.t_record.buy_quantity = None
+                t.data_row.t_record.sell_asset = asset
+                t.data_row.t_record.sell_quantity = Decimal(0)
             else:
-                tx_ids.remove(txn)
+                txns.remove(t)
+
 
 def output_records(t_ins, t_outs, t_fee):
     dup = bool(t_fee and t_fee in t_ins + t_outs)
@@ -186,6 +188,7 @@ def output_records(t_ins, t_outs, t_fee):
         sys.stderr.write("%smerge:   TR-O%s: %s\n" % (
             Fore.YELLOW, '*' if t_fee is t_out else '', t_out.t_record))
 
+
 def method_handling(t_ins, t_fee, staking_addresses):
     if t_fee.row_dict.get('Method') in ("Enter Staking", "Leave Staking", "Deposit", "Withdraw"):
         if t_ins:
@@ -197,9 +200,11 @@ def method_handling(t_ins, t_fee, staking_addresses):
                     t_ins.remove(staking[0])
 
                     if config.debug:
-                        sys.stderr.write("%smerge:     staking:\n" % (Fore.YELLOW))
+                        sys.stderr.write(
+                            "%smerge:     staking:\n" % (Fore.YELLOW))
                 else:
                     raise Exception
+
 
 def do_etherscan_multi_sell(t_ins, t_outs, t_fee):
     if config.debug:
@@ -217,7 +222,8 @@ def do_etherscan_multi_sell(t_ins, t_outs, t_fee):
 
     for cnt, t_out in enumerate(t_outs):
         if cnt < len(t_outs) - 1:
-            split_buy_quantity = (buy_quantity / len(t_outs)).quantize(PRECISION)
+            split_buy_quantity = (
+                buy_quantity / len(t_outs)).quantize(PRECISION)
             tot_buy_quantity += split_buy_quantity
         else:
             # Last t_out, use up remainder
@@ -237,6 +243,7 @@ def do_etherscan_multi_sell(t_ins, t_outs, t_fee):
     # Remove TR for buy now it's been added to each sell
     t_ins[0].t_record = None
 
+
 def do_etherscan_multi_buy(t_ins, t_outs, t_fee):
     if config.debug:
         sys.stderr.write("%smerge:     trade buy(s):\n" % (Fore.YELLOW))
@@ -253,7 +260,8 @@ def do_etherscan_multi_buy(t_ins, t_outs, t_fee):
 
     for cnt, t_in in enumerate(t_ins):
         if cnt < len(t_ins) - 1:
-            split_sell_quantity = (sell_quantity / len(t_ins)).quantize(PRECISION)
+            split_sell_quantity = (
+                sell_quantity / len(t_ins)).quantize(PRECISION)
             tot_sell_quantity += split_sell_quantity
         else:
             # Last t_in, use up remainder
@@ -273,6 +281,7 @@ def do_etherscan_multi_buy(t_ins, t_outs, t_fee):
     # Remove TR for sell now it's been added to each buy
     t_outs[0].t_record = None
 
+
 def do_fee_split(t_all, t_fee, fee_quantity, fee_asset):
     if config.debug:
         sys.stderr.write("%smerge:     split fees:\n" % (Fore.YELLOW))
@@ -284,7 +293,8 @@ def do_fee_split(t_all, t_fee, fee_quantity, fee_asset):
 
     for cnt, t in enumerate(t_all):
         if cnt < len(t_all) - 1:
-            split_fee_quantity = (fee_quantity / len(t_all)).quantize(PRECISION)
+            split_fee_quantity = (
+                fee_quantity / len(t_all)).quantize(PRECISION)
             tot_fee_quantity += split_fee_quantity
         else:
             # Last t, use up remainder
@@ -306,6 +316,7 @@ def do_fee_split(t_all, t_fee, fee_quantity, fee_asset):
         else:
             t_fee.t_record.fee_quantity = None
             t_fee.t_record.fee_asset = ''
+
 
 DataMerge("Etherscan fees & multi-token transactions",
           {TXNS: {'req': DataMerge.MAN, 'obj': etherscan_txns},
