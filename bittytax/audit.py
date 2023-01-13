@@ -4,10 +4,13 @@
 import sys
 from decimal import Decimal
 
+import csv
+
 from colorama import Fore, Back, Style
 from tqdm import tqdm
 
 from .config import config
+
 
 class AuditRecords(object):
     def __init__(self, transaction_records):
@@ -20,7 +23,8 @@ class AuditRecords(object):
 
         for tr in tqdm(transaction_records,
                        unit='tr',
-                       desc="%saudit transaction records%s" % (Fore.CYAN, Fore.GREEN),
+                       desc="%saudit transaction records%s" % (
+                           Fore.CYAN, Fore.GREEN),
                        disable=bool(config.debug or not sys.stdout.isatty())):
             if config.debug:
                 print("%saudit: TR %s" % (Fore.MAGENTA, tr))
@@ -28,7 +32,8 @@ class AuditRecords(object):
                 self._add_tokens(tr.wallet, tr.buy.asset, tr.buy.quantity)
 
             if tr.sell:
-                self._subtract_tokens(tr.wallet, tr.sell.asset, tr.sell.quantity)
+                self._subtract_tokens(
+                    tr.wallet, tr.sell.asset, tr.sell.quantity)
 
             if tr.fee:
                 self._subtract_tokens(tr.wallet, tr.fee.asset, tr.fee.quantity)
@@ -42,7 +47,8 @@ class AuditRecords(object):
                         wallet,
                         asset,
                         Style.BRIGHT,
-                        '{:0,f}'.format(self.wallets[wallet][asset].normalize()),
+                        '{:0,f}'.format(
+                            self.wallets[wallet][asset].normalize()),
                         Style.NORMAL))
 
             print("%saudit: final balances by asset" % Fore.CYAN)
@@ -128,10 +134,11 @@ class AuditRecords(object):
                     if config.debug:
                         print("%scheck pool: %s %s (mismatch)" % (
                             Fore.RED, asset,
-                            '{:+0,f}'.format((holdings[asset].quantity-
+                            '{:+0,f}'.format((holdings[asset].quantity -
                                               self.totals[asset]).normalize())))
 
-                    self._log_failure(asset, self.totals[asset], holdings[asset].quantity)
+                    self._log_failure(
+                        asset, self.totals[asset], holdings[asset].quantity)
                     passed = False
             else:
                 if config.debug:
@@ -151,25 +158,42 @@ class AuditRecords(object):
         self.failures.append(failure)
 
     def report_failures(self):
-        header = "%-8s %25s %25s %25s" % ('Asset',
-                                          'Audit Balance',
-                                          'Section 104 Pool',
-                                          'Difference')
+        with open('failed_assets.csv', 'w', newline='', encoding='utf-8') as csv_file:
+            writer = csv.writer(csv_file, lineterminator='\n')
+            header = "%-8s %25s %25s %25s" % ('Asset',
+                                              'Audit Balance',
+                                              'Section 104 Pool',
+                                              'Difference')
 
-        print('\n%s%s' % (Fore.YELLOW, header))
-        for failure in self.failures:
-            if failure['s104'] is not None:
-                print("%s%-8s %25s %25s %s%25s" % (
-                    Fore.WHITE,
-                    failure['asset'],
-                    '{:0,f}'.format(failure['audit'].normalize()),
-                    '{:0,f}'.format(failure['s104'].normalize()),
-                    Fore.RED,
-                    '{:+0,f}'.format((failure['s104']-failure['audit']).normalize())))
-            else:
-                print("%s%-8s %25s %s%25s" % (
-                    Fore.WHITE,
-                    failure['asset'],
-                    '{:0,f}'.format(failure['audit'].normalize()),
-                    Fore.RED,
-                    '<missing>'))
+            print('\n%s%s' % (Fore.YELLOW, header))
+            writer.writerow(['Asset',
+                             'Audit Balance',
+                             'Section 104 Pool',
+                             'Difference'])
+            for failure in self.failures:
+                if failure['s104'] is not None:
+                    print("%s%-8s %25s %25s %s%25s" % (
+                        Fore.WHITE,
+                        failure['asset'],
+                        '{:0,f}'.format(failure['audit'].normalize()),
+                        '{:0,f}'.format(failure['s104'].normalize()),
+                        Fore.RED,
+                        '{:+0,f}'.format((failure['s104']-failure['audit']).normalize())))
+                    writer.writerow([failure['asset'],
+                                     '{:0,f}'.format(
+                                         failure['audit'].normalize()),
+                                     '{:0,f}'.format(
+                                         failure['s104'].normalize()),
+                                     '{:+0,f}'.format((failure['s104']-failure['audit']).normalize())])
+                else:
+                    print("%s%-8s %25s %s%25s" % (
+                        Fore.WHITE,
+                        failure['asset'],
+                        '{:0,f}'.format(failure['audit'].normalize()),
+                        Fore.RED,
+                        '<missing>'))
+                    writer.writerow([
+                        failure['asset'],
+                        '{:0,f}'.format(failure['audit'].normalize()),
+                        '<missing>'
+                    ])

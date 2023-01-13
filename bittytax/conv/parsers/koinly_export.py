@@ -11,7 +11,7 @@ from ..out_record import TransactionOutRecord
 from ..dataparser import DataParser
 from ..exceptions import DataRowError, UnexpectedTypeError
 
-KOINLY_D_MAPPING = {'': TransactionOutRecord.TYPE_DEPOSIT,
+KOINLY_D_MAPPING = {'': TransactionOutRecord.TYPE_GIFT_RECEIVED,
                     'airdrop': TransactionOutRecord.TYPE_AIRDROP,
                     'fork': TransactionOutRecord.TYPE_GIFT_RECEIVED,
                     'mining': TransactionOutRecord.TYPE_MINING,
@@ -21,7 +21,7 @@ KOINLY_D_MAPPING = {'': TransactionOutRecord.TYPE_DEPOSIT,
                     'staking': TransactionOutRecord.TYPE_STAKING,
                     'realized_gain': None}
 
-KOINLY_W_MAPPING = {'': TransactionOutRecord.TYPE_WITHDRAWAL,
+KOINLY_W_MAPPING = {'': TransactionOutRecord.TYPE_GIFT_SENT,
                     'gift': TransactionOutRecord.TYPE_GIFT_SENT,
                     'lost': TransactionOutRecord.TYPE_LOST,
                     'cost': TransactionOutRecord.TYPE_SPEND,
@@ -132,3 +132,5 @@ DataParser(DataParser.TYPE_ACCOUNTING,
             'Description'],
            worksheet_name="Koinly",
            all_handler=parse_koinly)
+
+

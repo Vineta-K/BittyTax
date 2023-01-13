@@ -27,7 +27,7 @@ class ImportRecords(object):
         workbook = xlrd.open_workbook(filename)
         print("%sExcel file: %s%s" % (Fore.WHITE, Fore.YELLOW, filename))
 
-        for worksheet in workbook.sheets():
+        for worksheet in workbook.sheets()[0]: #bodge to only do one sheet for now
             if worksheet.name.startswith('--'):
                 print("%sskipping '%s' worksheet" % (Fore.GREEN, worksheet.name))
                 continue

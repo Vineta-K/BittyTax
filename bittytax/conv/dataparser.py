@@ -30,7 +30,7 @@ class DataParser(object):
     parsers = []
 
     def __init__(self, p_type, name, header, delimiter=',',
-                 worksheet_name=None, row_handler=None, all_handler=None):
+                 worksheet_name=None, row_handler=None, all_handler=None, chain_asset=None, wallet_name=None):
         self.p_type = p_type
         self.name = name
         self.header = header
@@ -38,6 +38,8 @@ class DataParser(object):
         self.delimiter = delimiter
         self.row_handler = row_handler
         self.all_handler = all_handler
+        self.chain_asset = chain_asset
+        self.wallet_name = wallet_name
         self.args = []
         self.in_header = None
         self.in_header_row_num = None

@@ -12,7 +12,10 @@ from ...config import config
 from ..out_record import TransactionOutRecord
 from ..datamerge import DataMerge, MergeDataRow
 from ..exceptions import UnexpectedContentError
-from ..parsers.etherscan import etherscan_txns, etherscan_tokens, etherscan_nfts, etherscan_int, \
+from ..parsers.etherscan_like import  etherscan_like_tokens, etherscan_like_nfts,  \
+    etherscan_txns, etherscan_int,\
+    arbi_txns, arbi_int, \
+    bsc_txns, bsc_int, \
     get_note
 
 PRECISION = Decimal('0.' + '0' * 18)
@@ -23,7 +26,7 @@ NFTS = 'nft'
 INTERNAL_TXNS = 'int'
 
 
-def merge_etherscan(data_files):
+def merge_etherscan_like(data_files):
     return do_merge_etherscan(data_files, [])
 
 
@@ -318,9 +321,9 @@ def do_fee_split(t_all, t_fee, fee_quantity, fee_asset):
             t_fee.t_record.fee_asset = ''
 
 
-DataMerge("Etherscan fees & multi-token transactions",
+DataMerge("Etherscan-like fees & multi-token transactions",
           {TXNS: {'req': DataMerge.MAN, 'obj': etherscan_txns},
-           TOKENS: {'req': DataMerge.OPT, 'obj': etherscan_tokens},
-           NFTS: {'req': DataMerge.OPT, 'obj': etherscan_nfts},
+           TOKENS: {'req': DataMerge.OPT, 'obj': etherscan_like_tokens},
+           NFTS: {'req': DataMerge.OPT, 'obj': etherscan_like_nfts},
            INTERNAL_TXNS: {'req': DataMerge.OPT, 'obj': etherscan_int}},
-          merge_etherscan)
+          merge_etherscan_like)

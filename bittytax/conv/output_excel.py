@@ -80,11 +80,12 @@ class OutputExcel(OutputBase):
             worksheet = Worksheet(self, data_file)
 
             data_rows = sorted(data_file.data_rows, key=lambda dr: dr.timestamp, reverse=False)
-            for i, data_row in enumerate(data_rows):
+            data_rows_not_none = [data_row for data_row in data_rows if data_row.t_record is not None]
+            for i, data_row in enumerate(data_rows_not_none):
                 worksheet.add_row(data_row, i + 1)
 
-            if data_rows:
-                worksheet.make_table(len(data_rows), data_file.parser.worksheet_name)
+            if data_rows_not_none:
+                worksheet.make_table(len(data_rows_not_none), data_file.parser.worksheet_name)
             else:
                 # Just add headings
                 for i, columns in enumerate(worksheet.columns):
