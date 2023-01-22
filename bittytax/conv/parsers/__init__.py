@@ -48,6 +48,7 @@ from . import okex
 from . import poloniex
 from . import qtrade
 from . import qtwallet
+from . import rhinofi
 from . import tradesatoshi
 from . import trezor
 from . import trezorsuite

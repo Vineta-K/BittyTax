@@ -74,6 +74,17 @@ class ValueAsset(object):
                                                                                      no_cache)
             self.price_report_cache(asset, timestamp, name, data_source, url, asset_price_ccy)
         else:
+            #Super grim bodge
+            if asset.startswith('any'):
+                asset = asset[3:]
+            if asset in ['fUSDT',"BSC-USD"] :
+                asset = "USDT"
+            if asset.endswith('.m') or asset.endswith('.e'):
+                asset = asset[:-2]
+            if asset in ['xDAI', 'LP-DAI']:
+                asset = 'DAI'
+            
+
             asset_price_btc, name, data_source, url = self.price_data.get_historical(asset,
                                                                                      'BTC',
                                                                                      timestamp,
