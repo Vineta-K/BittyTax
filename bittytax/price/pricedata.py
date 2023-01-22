@@ -10,18 +10,6 @@ from ..config import config
 from .datasource import DataSourceBase
 from .exceptions import UnexpectedDataSourceError
 
-asset_api_map = {
-    'TIME': 'wonderland',
-    'GB': 'good-bridging',
-    'TRI': 'trisolaris',
-    'MIM': 'magic-internet-money',
-    'HUSKY':'husky-avax',
-    'NYAN': 'arbinyan',
-    'renBTC': 'renbtc',
-    'QI': 'benqi',
-    
-}
-
 class PriceData(object):
     def __init__(self, data_sources_required, price_tool=False):
         self.price_tool = price_tool
@@ -66,12 +54,7 @@ class PriceData(object):
                               self.data_sources[data_source.upper()].prices[pair][date]['url']
 
 
-                #Override certain coins to use correct api price
-                if asset in asset_api_map.keys():
-                    api_name = asset_api_map[asset]
-                    self.data_sources['COINGECKO'].get_historical(asset, quote, timestamp, asset_id = api_name)
-                else:
-                    self.data_sources[data_source.upper()].get_historical(asset, quote, timestamp)
+                self.data_sources[data_source.upper()].get_historical(asset, quote, timestamp)
 
                 if pair in self.data_sources[data_source.upper()].prices and \
                    date in self.data_sources[data_source.upper()].prices[pair]:
